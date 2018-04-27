@@ -316,7 +316,7 @@
     "description": "The default state for the per-site no-scripting switch"
   },
   "settingsNoCSPReportsPrompt": {
-    "message": "منع تقارير الـ CSP",
+    "message": "حظر تقارير الـ CSP",
     "description": "background information: https://github.com/gorhill/uBlock/issues/3150"
   },
   "settingsStorageUsed": {
