@@ -20,8 +20,6 @@
 */
 
 
-/* global objectAssign */
-
 'use strict';
 
 /******************************************************************************/
@@ -100,7 +98,7 @@ var µBlock = (function() { // jshint ignore:line
 
         hiddenSettingsDefault: hiddenSettingsDefault,
         hiddenSettings: (function() {
-            var out = objectAssign({}, hiddenSettingsDefault),
+            var out = Object.assign({}, hiddenSettingsDefault),
                 json = vAPI.localStorage.getItem('immediateHiddenSettings');
             if ( typeof json === 'string' ) {
                 try {

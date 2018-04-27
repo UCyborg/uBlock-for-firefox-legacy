@@ -20,7 +20,6 @@ cp    src/*.html                        $DES/
 
 mv    $DES/img/icon_128.png             $DES/icon.png
 cp    platform/firefox/css/*            $DES/css/
-cp    platform/firefox/polyfill.js      $DES/js/
 cp    platform/firefox/vapi-*.js        $DES/js/
 cp    platform/firefox/bootstrap.js     $DES/
 cp    platform/firefox/processScript.js $DES/
