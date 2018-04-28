@@ -764,7 +764,7 @@
     "description": "tooltip"
   },
   "cloudNoData": {
-    "message": "...\n...",
+    "message": "... ...",
     "description": ""
   },
   "cloudDeviceNamePrompt": {

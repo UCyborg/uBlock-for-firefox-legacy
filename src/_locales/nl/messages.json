@@ -588,7 +588,7 @@
     "description": "Used in the static filtering wizard"
   },
   "loggerStaticFilteringSentencePartAnyType": {
-    "message": "elk type",
+    "message": "alle typen",
     "description": "Used in the static filtering wizard"
   },
   "loggerStaticFilteringSentencePartOrigin": {

@@ -376,7 +376,7 @@
     "description": "English: Apply changes"
   },
   "3pGroupDefault": {
-    "message": "Локално",
+    "message": "Уграђени",
     "description": "Header for the uBlock filters section in 'Filter lists pane'"
   },
   "3pGroupAds": {
