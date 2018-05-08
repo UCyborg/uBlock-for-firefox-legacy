@@ -388,7 +388,7 @@
     "description": "English: Privacy"
   },
   "3pGroupMalware": {
-    "message": "ウイルス",
+    "message": "マルウェア ドメイン",
     "description": "English: Malware domains"
   },
   "3pGroupAnnoyances": {
@@ -432,7 +432,7 @@
     "description": "used as a tooltip for error icon beside a list"
   },
   "1pFormatHint": {
-    "message": "1行につき1つのフィルターです。フィルターはただのホストネームでもAdblock Plus適合のフィルターでも構いません。&lsquo;!&rsquo;ですでに固定されている行は無視されます。",
+    "message": "1行につき1つのフィルターです。フィルターはただのホストネームでもAdblock Plus書式のフィルターでも構いません。<code>!<\/code> が先頭にある行は無視されます。",
     "description": "Short information about how to create custom filters"
   },
   "1pImport": {
@@ -616,7 +616,7 @@
     "description": "Message to show when a filter cannot be found in any filter lists"
   },
   "aboutChangelog": {
-    "message": "バージョン更新履歴 (Change log)",
+    "message": "更新履歴",
     "description": "English: Change log"
   },
   "aboutWiki": {
