@@ -92,7 +92,7 @@
     "description": "English: Click to open the dashboard"
   },
   "popupTipZapper": {
-    "message": "Entrar no modo elemento zapper",
+    "message": "Entrar no modo de exclusão de elemento",
     "description": "Tooltip for the element-zapper icon in the popup panel"
   },
   "popupTipPicker": {
@@ -544,7 +544,7 @@
     "description": "Pretty name for behind-the-scene network requests"
   },
   "loggerCurrentTab": {
-    "message": "Aba atual",
+    "message": "Guia atual",
     "description": "Appears in the logger's tab selector"
   },
   "logFilterPrompt": {
@@ -636,7 +636,7 @@
     "description": "English: Source code (GPLv3)"
   },
   "aboutContributors": {
-    "message": "Contribuidores",
+    "message": "Colaboradores",
     "description": "English: Contributors"
   },
   "aboutDependencies": {
