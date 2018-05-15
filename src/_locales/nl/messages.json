@@ -560,7 +560,7 @@
     "description": "Label for the context selector"
   },
   "loggerURLFilteringTypeLabel": {
-    "message": "Soort:",
+    "message": "Type:",
     "description": "Label for the type selector"
   },
   "loggerURLFilteringHeader": {

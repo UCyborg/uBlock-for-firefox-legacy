@@ -184,7 +184,7 @@
     "description": ""
   },
   "popup3pAnyRulePrompt": {
-    "message": "Трети страни",
+    "message": "3-ти страни",
     "description": ""
   },
   "popup3pPassiveRulePrompt": {
@@ -196,15 +196,15 @@
     "description": ""
   },
   "popup1pScriptRulePrompt": {
-    "message": "Скриптове от първи страни",
+    "message": "Скриптове от 1-ви страни",
     "description": ""
   },
   "popup3pScriptRulePrompt": {
-    "message": "Скриптове от трети страни",
+    "message": "Скриптове от 3-ти страни",
     "description": ""
   },
   "popup3pFrameRulePrompt": {
-    "message": "Рамки от 3-ти лица",
+    "message": "Рамки от 3-ти страни",
     "description": ""
   },
   "popupHitDomainCountPrompt": {
