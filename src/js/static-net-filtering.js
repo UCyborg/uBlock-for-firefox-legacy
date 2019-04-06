@@ -2327,7 +2327,7 @@ FilterContainer.prototype.fromCompiledContent = function(reader) {
 /******************************************************************************/
 
 FilterContainer.prototype.matchAndFetchData = function(dataType, requestURL, out, outlog) {
-    if ( this.dataFilters.length === 0 ) { return; }
+    if ( this.dataFilters.size === 0 ) { return; }
 
     var url = this.urlTokenizer.setURL(requestURL);
 
