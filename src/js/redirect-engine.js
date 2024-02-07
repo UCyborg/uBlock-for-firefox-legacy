@@ -146,7 +146,6 @@ let RedirectEngine = function() {
     this.resources = new Map();
     this.reset();
     this.resourceNameRegister = '';
-    this._desAll = []; // re-use better than re-allocate
 };
 
 /******************************************************************************/
@@ -156,6 +155,7 @@ RedirectEngine.prototype.reset = function() {
     this.ruleTypes = new Set();
     this.ruleSources = new Set();
     this.ruleDestinations = new Set();
+    this._desAll = []; // re-use better than re-allocate
     this.modifyTime = Date.now();
 };
 
@@ -177,13 +177,13 @@ RedirectEngine.prototype.toBroaderHostname = function(hostname) {
 /******************************************************************************/
 
 RedirectEngine.prototype.lookup = function(context) {
-    var type = context.requestType;
+    const type = context.requestType;
     if ( this.ruleTypes.has(type) === false ) { return; }
-    var src = context.pageHostname,
+    const desAll = this._desAll,
+          reqURL = context.requestURL;
+    let src = context.pageHostname,
         des = context.requestHostname,
-        desAll = this._desAll,
-        reqURL = context.requestURL;
-    var n = 0;
+        n = 0;
     for (;;) {
         if ( this.ruleDestinations.has(des) ) {
             desAll[n] = des; n += 1;
@@ -192,11 +192,10 @@ RedirectEngine.prototype.lookup = function(context) {
         if ( des === '' ) { break; }
     }
     if ( n === 0 ) { return; }
-    var entries;
     for (;;) {
         if ( this.ruleSources.has(src) ) {
-            for ( var i = 0; i < n; i++ ) {
-                entries = this.rules.get(src + ' ' + desAll[i] + ' ' + type);
+            for ( let i = 0; i < n; i++ ) {
+                const entries = this.rules.get(`${src} ${desAll[i]} ${type}`);
                 if ( entries && this.lookupToken(entries, reqURL) ) {
                     return this.resourceNameRegister;
                 }
@@ -279,106 +278,121 @@ RedirectEngine.prototype.addRule = function(src, des, type, pattern, redirect) {
 /******************************************************************************/
 
 RedirectEngine.prototype.fromCompiledRule = function(line) {
-    var fields = line.split('\t');
-    if ( fields.length !== 5 ) {
-        return;
-    }
+    const fields = line.split('\t');
+    if ( fields.length !== 5 ) { return; }
     this.addRule(fields[0], fields[1], fields[2], fields[3], fields[4]);
 };
 
 /******************************************************************************/
 
 RedirectEngine.prototype.compileRuleFromStaticFilter = function(line) {
-    var matches = this.reFilterParser.exec(line);
-    if ( matches === null || matches.length !== 4 ) {
-        return;
+    const matches = this.reFilterParser.exec(line);
+    if ( matches === null || matches.length !== 4 ) { return; }
+
+    const des = matches[1] || '';
+
+    // https://github.com/uBlockOrigin/uBlock-issues/issues/572
+    //   Extract best possible hostname.
+    let deshn = des;
+    let pos = deshn.lastIndexOf('*');
+    if ( pos !== -1 ) {
+        deshn = deshn.slice(pos + 1);
+        pos = deshn.indexOf('.');
+        if ( pos !== -1 ) {
+            deshn = deshn.slice(pos + 1);
+        } else {
+            deshn = '';
+        }
     }
-    var µburi = µBlock.URI,
-        des = matches[1] || '',
-        pattern = (des + matches[2]).replace(/[.+?{}()|[\]\/\\]/g, '\\$&')
-                                    .replace(/\^/g, '[^\\w.%-]')
-                                    .replace(/\*/g, '.*?'),
-        type,
+
+    const path = matches[2] || '';
+    let pattern =
+            des
+                .replace(/\*/g, '[\\w.%-]*')
+                .replace(/\./g, '\\.') +
+            path
+                .replace(/[.+?{}()|[\]\/\\]/g, '\\$&')
+                .replace(/\^/g, '[^\\w.%-]')
+                .replace(/\*/g, '.*?');
+    if ( pattern === '' ) {
+        pattern = '^';
+    }
+
+    let type,
         redirect = '',
-        srcs = [],
-        options = matches[3].split(','), option;
-    while ( (option = options.pop()) ) {
+        srchns = [];
+    for ( const option of matches[3].split(',') ) {
         if ( option.startsWith('redirect=') ) {
             redirect = option.slice(9);
             continue;
         }
+        if ( option.startsWith('redirect-rule=') ) {
+            redirect = option.slice(14);
+            continue;
+        }
         if ( option.startsWith('domain=') ) {
-            srcs = option.slice(7).split('|');
+            srchns = option.slice(7).split('|');
             continue;
         }
         if ( option.startsWith('from=') ) {
-            srcs = option.slice(5).split('|');
+            srchns = option.slice(5).split('|');
             continue;
         }
-        if ( option === 'first-party' ) {
-            srcs.push(µburi.domainFromHostname(des) || des);
+        if ( (option === 'first-party' || option === '1p') && deshn !== '' ) {
+            srchns.push(µBlock.URI.domainFromHostname(deshn) || deshn);
             continue;
         }
         // One and only one type must be specified.
-        if ( option in this.supportedTypes ) {
-            if ( type !== undefined ) {
-                return;
-            }
-            type = this.supportedTypes[option];
+        if ( this.supportedTypes.has(option) ) {
+            if ( type !== undefined ) { return; }
+            type = this.supportedTypes.get(option);
             continue;
         }
     }
 
     // Need a resource token.
-    if ( redirect === '' ) {
-        return;
-    }
+    if ( redirect === '' ) { return; }
 
     // Need one single type -- not negated.
-    if ( type === undefined || type.startsWith('~') ) {
-        return;
+    if ( type === undefined ) { return; }
+
+    if ( deshn === '' ) {
+        deshn = '*';
     }
 
-    if ( des === '' ) {
-        des = '*';
+    if ( srchns.length === 0 ) {
+        srchns.push('*');
     }
 
-    if ( srcs.length === 0 ) {
-        srcs.push('*');
+    const out = [];
+    for ( const srchn of srchns ) {
+        if ( srchn === '' ) { continue; }
+        if ( srchn.startsWith('~') ) { continue; }
+        out.push(`${srchn}\t${deshn}\t${type}\t${pattern}\t${redirect}`);
     }
 
-    var out = [];
-    var i = srcs.length, src;
-    while ( i-- ) {
-        src = srcs[i];
-        if ( src === '' ) {
-            continue;
-        }
-        if ( src.startsWith('~') ) {
-            continue;
-        }
-        out.push(src + '\t' + des + '\t' + type + '\t' + pattern + '\t' + redirect);
-    }
+    if ( out.length === 0 ) { return; }
 
     return out;
 };
 
 /******************************************************************************/
 
-RedirectEngine.prototype.reFilterParser = /^(?:\|\|([^\/:?#^*]+)|\*)([^$]+)\$([^$]+)$/;
+RedirectEngine.prototype.reFilterParser = /^(?:\|\|([^\/:?#^]+)|\*?)([^$]+)?\$([^$]+)$/;
 
-RedirectEngine.prototype.supportedTypes = (function() {
-    var types = Object.create(null);
-    types.font = 'font';
-    types.image = 'image';
-    types.media = 'media';
-    types.object = 'object';
-    types.script = 'script';
-    types.stylesheet = 'stylesheet';
-    types.subdocument = 'sub_frame';
-    types.xmlhttprequest = 'xmlhttprequest';
-    return types;
-})();
+RedirectEngine.prototype.supportedTypes = new Map([
+    [ 'css', 'stylesheet' ],
+    [ 'font', 'font' ],
+    [ 'image', 'image' ],
+    [ 'media', 'media' ],
+    [ 'object', 'object' ],
+    [ 'script', 'script' ],
+    [ 'stylesheet', 'stylesheet' ],
+    [ 'frame', 'sub_frame' ],
+    [ 'subdocument', 'sub_frame' ],
+    [ 'xhr', 'xmlhttprequest' ],
+    [ 'xmlhttprequest', 'xmlhttprequest' ],
+]);
 
 /******************************************************************************/
 
@@ -417,6 +431,7 @@ RedirectEngine.prototype.fromSelfie = function(selfie) {
     this.ruleTypes = new Set(selfie.ruleTypes);
     this.ruleSources = new Set(selfie.ruleSources);
     this.ruleDestinations = new Set(selfie.ruleDestinations);
+    this._desAll = []; // re-use better than re-allocate
     this.modifyTime = Date.now();
     return true;
 };

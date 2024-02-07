@@ -1406,7 +1406,7 @@ FilterParser.prototype.reset = function() {
     this.domainOpt = '';
     this.isRegex = false;
     this.raw = '';
-    this.redirect = false;
+    this.redirect = 0;
     this.token = '*';
     this.tokenHash = this.noTokenHash;
     this.tokenBeg = 0;
@@ -1504,25 +1504,9 @@ FilterParser.prototype.parseOptions = function(s) {
             this.parsePartyOption(false, not);
             continue;
         }
-        // https://issues.adblockplus.org/ticket/616
-        // `generichide` concept already supported, just a matter of
-        // adding support for the new keyword.
-        if ( opt === 'elemhide' || opt === 'generichide' ) {
-            if ( not === false ) {
-                this.parseTypeOption('generichide', false);
-                continue;
-            }
-            this.unsupported = true;
-            break;
-        }
-        // Test before handling all other types.
-        if ( opt.startsWith('redirect=') ) {
-            if ( this.action === BlockAction ) {
-                this.redirect = true;
-                continue;
-            }
-            this.unsupported = true;
-            break;
+        if ( opt === 'first-party' || opt === '1p' ) {
+            this.parsePartyOption(true, not);
+            continue;
         }
         if ( this.toNormalizedType.hasOwnProperty(opt) ) {
             this.parseTypeOption(opt, not);
@@ -1551,8 +1535,12 @@ FilterParser.prototype.parseOptions = function(s) {
             this.important = Important;
             continue;
         }
-        if ( opt === 'first-party' || opt === '1p' ) {
-            this.parsePartyOption(true, not);
+        if ( /^redirect(?:-rule)?=/.test(opt) ) {
+            if ( this.redirect !== 0 ) {
+                this.unsupported = true;
+                break;
+            }
+            this.redirect = opt.charCodeAt(8) === 0x3D /* '=' */ ? 1 : 2;
             continue;
         }
         if ( opt.startsWith('csp=') ) {
@@ -1581,6 +1569,11 @@ FilterParser.prototype.parseOptions = function(s) {
         // Unrecognized filter option: ignore whole filter.
         this.unsupported = true;
         break;
+    }
+
+    // Redirect rules can't be exception filters.
+    if ( this.redirect !== 0 && this.action !== BlockAction ) {
+        this.unsupported = true;
     }
 };
 
@@ -2174,6 +2167,19 @@ FilterContainer.prototype.compile = function(raw, writer) {
         return false;
     }
 
+    // Redirect rule
+    if ( parsed.redirect !== 0 ) {
+        const result = this.compileRedirectRule(parsed, writer);
+        if ( result === false ) {
+            const who = writer.properties.get('assetKey') || '?';
+            µb.logger.writeOne('', 'error', `Invalid redirect rule in ${who}: ${raw}`);
+            return false;
+        }
+        if ( parsed.redirect === 2 ) {
+            return true;
+        }
+    }
+
     // Pure hostnames, use more efficient dictionary lookup
     // https://github.com/chrisaljoudi/uBlock/issues/665
     // Create a dict keyed on request type etc.
@@ -2259,11 +2265,7 @@ FilterContainer.prototype.compileToAtomicFilter = function(
 
     // 0 = network filters
     // 1 = network filters: bad filters
-    if ( parsed.badFilter ) {
-        writer.select(1);
-    } else {
-        writer.select(0);
-    }
+    writer.select(parsed.badFilter ? 1 : 0);
 
     let descBits = parsed.action | parsed.important | parsed.party;
     let type = parsed.types;
@@ -2289,17 +2291,19 @@ FilterContainer.prototype.compileToAtomicFilter = function(
         bitOffset += 1;
         type >>>= 1;
     } while ( type !== 0 );
+};
 
-    // Only static filter with an explicit type can be redirected. If we reach
-    // this point, it's because there is one or more explicit type.
-    if ( parsed.badFilter === false && parsed.redirect ) {
-        let redirects = µb.redirectEngine.compileRuleFromStaticFilter(parsed.raw);
-        if ( Array.isArray(redirects) ) {
-            for ( let redirect of redirects ) {
-                writer.push([ typeNameToTypeValue.redirect, redirect ]);
-            }
-        }
+/******************************************************************************/
+
+FilterContainer.prototype.compileRedirectRule = function(parsed, writer) {
+    const redirects = µb.redirectEngine.compileRuleFromStaticFilter(parsed.raw);
+    if ( Array.isArray(redirects) === false ) { return false; }
+    writer.select(parsed.badFilter ? 1 : 0);
+    const type = typeNameToTypeValue.redirect;
+    for ( const redirect of redirects ) {
+        writer.push([ type, redirect ]);
     }
+    return true;
 };
 
 /******************************************************************************/
