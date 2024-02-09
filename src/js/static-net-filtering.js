@@ -771,9 +771,9 @@ FilterOrigin.prototype.logData = function() {
         domainOpt = this.toDomainOpt();
     out.compiled = [ this.fid, domainOpt, out.compiled ];
     if ( out.opts === undefined ) {
-        out.opts = 'domain=' + domainOpt;
+        out.opts = 'from=' + domainOpt;
     } else {
-        out.opts += ',domain=' + domainOpt;
+        out.opts += ',from=' + domainOpt;
     }
     return out;
 };
@@ -1533,6 +1533,14 @@ FilterParser.prototype.parseOptions = function(s) {
         // characters.
         if ( opt.startsWith('domain=') ) {
             this.domainOpt = this.parseDomainOption(opt.slice(7));
+            if ( this.domainOpt === '' ) {
+                this.unsupported = true;
+                break;
+            }
+            continue;
+        }
+        if ( opt.startsWith('from=') ) {
+            this.domainOpt = this.parseDomainOption(opt.slice(5));
             if ( this.domainOpt === '' ) {
                 this.unsupported = true;
                 break;

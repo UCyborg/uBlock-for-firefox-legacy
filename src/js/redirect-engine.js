@@ -311,6 +311,10 @@ RedirectEngine.prototype.compileRuleFromStaticFilter = function(line) {
             srcs = option.slice(7).split('|');
             continue;
         }
+        if ( option.startsWith('from=') ) {
+            srcs = option.slice(5).split('|');
+            continue;
+        }
         if ( option === 'first-party' ) {
             srcs.push(µburi.domainFromHostname(des) || des);
             continue;
