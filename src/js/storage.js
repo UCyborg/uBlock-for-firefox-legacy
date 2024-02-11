@@ -787,14 +787,14 @@
 //   Lower minimum update period to 1 day.
 
 µBlock.extractFilterListMetadata = function(assetKey, raw) {
-    let listEntry = this.availableFilterLists[assetKey];
+    const listEntry = this.availableFilterLists[assetKey];
     if ( listEntry === undefined ) { return; }
     // Metadata expected to be found at the top of content.
-    let head = raw.slice(0, 1024);
+    const head = raw.slice(0, 1024);
     // https://github.com/gorhill/uBlock/issues/313
     // Always try to fetch the name if this is an external filter list.
     if ( listEntry.title === '' || listEntry.group === 'custom' ) {
-        let matches = head.match(/(?:^|\n)(?:!|# )[\t ]*Title:([^\n]+)/i);
+        const matches = head.match(/(?:^|\n)(?:!|# )[\t ]*Title:([^\n]+)/i);
         if ( matches !== null ) {
             // https://bugs.chromium.org/p/v8/issues/detail?id=2869
             // orphanizeString is to work around String.slice()
@@ -804,9 +804,17 @@
         }
     }
     // Extract update frequency information
-    let matches = head.match(/(?:^|\n)(?:!|# )[\t ]*Expires:[\t ]*(\d+)[\t ]*day/i);
+    const matches = head.match(/(?:^|\n)(?:!|# )[\t ]*Expires:[\t ]*(\d+)\s*([wdhm]?)/i);
     if ( matches !== null ) {
-        let v = Math.max(parseInt(matches[1], 10), 1);
+        let v = parseInt(matches[1], 10);
+        if ( v === 0 ) { return; }
+        if ( matches[2] === 'w' ) {
+            v *= 7;
+        } else if ( matches[2] === 'h' ) {
+            v = Math.max(v, 4) / 24;
+        } else if ( matches[2] === 'm' ) {
+            v = Math.max(v, 240) / 1440;
+        }
         if ( v !== listEntry.updateAfter ) {
             this.assets.registerAssetSource(assetKey, { updateAfter: v });
         }

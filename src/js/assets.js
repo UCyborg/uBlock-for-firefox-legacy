@@ -32,6 +32,10 @@ var reIsExternalPath = /^(?:[a-z-]+):\/\//,
     errorCantConnectTo = vAPI.i18n('errorCantConnectTo'),
     noopfunc = function(){};
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+const EXPIRES_DEFAULT = 7;
+
 var api = {
 };
 
@@ -329,7 +333,7 @@ var registerAssetSource = function(assetKey, dict) {
         entry.contentURL = [];
     }
     if ( typeof entry.updateAfter !== 'number' ) {
-        entry.updateAfter = 5;
+        entry.updateAfter = EXPIRES_DEFAULT;
     }
     if ( entry.submitter ) {
         entry.submitTime = Date.now(); // To detect stale entries
@@ -918,7 +922,7 @@ api.metadata = function(callback) {
                 assetEntry.cached = true;
                 assetEntry.writeTime = cacheEntry.writeTime;
                 const obsoleteAfter =
-                    cacheEntry.writeTime + assetEntry.updateAfter * 86400000;
+                    cacheEntry.writeTime + assetEntry.updateAfter * MS_PER_DAY;
                 assetEntry.obsolete = obsoleteAfter < now;
                 assetEntry.remoteURL = cacheEntry.remoteURL;
             } else if (
@@ -991,7 +995,7 @@ var updateNext = function() {
             assetEntry = assetDict[assetKey];
             if ( updaterFetched.has(assetKey) ) { continue; }
             cacheEntry = cacheDict[assetKey];
-            if ( cacheEntry && (cacheEntry.writeTime + assetEntry.updateAfter * 86400000) > now ) {
+            if ( cacheEntry && (cacheEntry.writeTime + assetEntry.updateAfter * MS_PER_DAY) > now ) {
                 continue;
             }
             if (
