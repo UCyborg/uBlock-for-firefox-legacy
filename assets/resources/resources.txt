@@ -2147,6 +2147,78 @@ function(good) {
 }
 
 
+# Parameter is a specific type of canvas API to prevent (default to all
+# APIs). Can be a string or regex which will be matched against the type
+# used in getContext() call. Prepend with `!` to test for no-match.
+#
+# Reference: https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/getContext
+prevent-canvas.js application/javascript
+function(contextType) {
+	'use strict';
+	const scriptletGlobals = {};
+	function safeSelf() {
+		if ( scriptletGlobals.safeSelf ) {
+			return scriptletGlobals.safeSelf;
+		}
+		const self = window;
+		const safe = {
+			'RegExp': self.RegExp,
+			'RegExp_test': self.RegExp.prototype.test,
+			escapeRegexChars(s) {
+				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			},
+			initPattern(pattern, options = {}) {
+				if ( pattern === '' ) {
+					return { matchAll: true };
+				}
+				const expect = (options.canNegate !== true || pattern.startsWith('!') === false);
+				if ( expect === false ) {
+					pattern = pattern.slice(1);
+				}
+				const match = /^\/(.+)\/([gimsu]*)$/.exec(pattern);
+				if ( match !== null ) {
+					return {
+						re: new this.RegExp(
+							match[1],
+							match[2] || options.flags
+						),
+						expect,
+					};
+				}
+				if ( options.flags !== undefined ) {
+					return {
+						re: new this.RegExp(this.escapeRegexChars(pattern),
+							options.flags
+						),
+						expect,
+					};
+				}
+				return { pattern, expect };
+			},
+			testPattern(details, haystack) {
+				if ( details.matchAll ) { return true; }
+				if ( details.re ) {
+					return this.RegExp_test.call(details.re, haystack) === details.expect;
+				}
+				return haystack.includes(details.pattern) === details.expect;
+			},
+		};
+		scriptletGlobals.safeSelf = safe;
+		return safe;
+	}
+	if ( contextType === undefined ) { contextType = ''; }
+	const safe = safeSelf();
+	const pattern = safe.initPattern(contextType, { canNegate: true });
+	const proto = self.HTMLCanvasElement.prototype;
+	proto.getContext = new Proxy(proto.getContext, {
+		apply(target, thisArg, args) {
+			if ( safe.testPattern(pattern, args[0]) ) { return null; }
+			return Reflect.apply(target, thisArg, args);
+		}
+	});
+}
+
+
 # https://www.reddit.com/r/firefox/comments/4wpd23/popads_just_announced_that_they_have_a_new_method/
 popads.js application/javascript
 alias popads.net.js
