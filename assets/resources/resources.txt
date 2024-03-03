@@ -6131,6 +6131,95 @@ function(key, value) {
 }
 
 
+remove-cache-storage-item.js application/javascript
+function(cacheNamePattern, requestPattern) {
+	'use strict';
+	const scriptletGlobals = {};
+	function safeSelf() {
+		if ( scriptletGlobals.safeSelf ) {
+			return scriptletGlobals.safeSelf;
+		}
+		const self = window;
+		const safe = {
+			'Object_fromEntries': Object.fromEntries.bind(Object),
+			escapeRegexChars(s) {
+				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			},
+			patternToRegex(pattern, flags = undefined, verbatim = false) {
+				if ( pattern === '' ) { return /^/; }
+				const match = /^\/(.+)\/([gimsu]*)$/.exec(pattern);
+				if ( match === null ) {
+					const reStr = this.escapeRegexChars(pattern);
+					return new RegExp(verbatim ? `^${reStr}$` : reStr, flags);
+				}
+				try {
+					return new RegExp(match[1], match[2] || undefined);
+				}
+				catch(ex) {
+				}
+				return /^/;
+			},
+			getExtraArgs(args, offset = 0) {
+				const entries = args.slice(offset).reduce((out, v, i, a) => {
+					if ( (i & 1) === 0 ) {
+						const rawValue = a[i+1];
+						const value = /^\d+$/.test(rawValue)
+							? parseInt(rawValue, 10)
+							: rawValue;
+						out.push([ a[i], value ]);
+					}
+					return out;
+				}, []);
+				return this.Object_fromEntries(entries);
+			},
+		};
+		scriptletGlobals.safeSelf = safe;
+		return safe;
+	}
+	function makeLogPrefix(...args) {
+		return `uBO: [${args.join(' \u205D ')}]` || '';
+	}
+	if ( cacheNamePattern  === undefined || cacheNamePattern  === '' ) { return; }
+	if ( requestPattern === undefined ) { requestPattern = ''; }
+	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('remove-cache-storage-item', cacheNamePattern, requestPattern));
+	const extraArgs = safe.getExtraArgs(Array.from(arguments), 2);
+	const cacheStorage = self.caches;
+	if ( cacheStorage instanceof Object === false ) { return; }
+	const reCache = safe.patternToRegex(cacheNamePattern, undefined, true);
+	const reRequest = safe.patternToRegex(requestPattern, undefined, true);
+	cacheStorage.keys().then(cacheNames => {
+		for ( const cacheName of cacheNames ) {
+			if ( reCache.test(cacheName) === false ) { continue; }
+			if ( requestPattern === '' ) {
+				cacheStorage.delete(cacheName).then(result => {
+					if ( extraArgs.scriptletLogLevel > 1 ) {
+						log(`Deleting ${cacheName}`);
+					}
+					if ( result !== true ) { return; }
+					log(`Deleted ${cacheName}: ${result}`);
+				});
+				continue;
+			}
+			cacheStorage.open(cacheName).then(cache => {
+				cache.keys().then(requests => {
+					for ( const request of requests ) {
+						if ( reRequest.test(request.url) === false ) { continue; }
+						if ( extraArgs.scriptletLogLevel > 1 ) {
+							log(`Deleting ${cacheName}/${request.url}`);
+						}
+						cache.delete(request).then(result => {
+							if ( result !== true ) { return; }
+							log(`Deleted ${cacheName}/${request.url}: ${result}`);
+						});
+					}
+				});
+			});
+		}
+	});
+}
+
+
 # Imported from:
 # https://github.com/NanoAdblocker/NanoFilters/blob/1f3be7211bb0809c5106996f52564bf10c4525f7/NanoFiltersSource/NanoResources.txt#L82
 #
