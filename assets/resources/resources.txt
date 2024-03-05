@@ -8851,6 +8851,147 @@ function(propChain, rawPrunePaths, rawNeedlePaths) {
 }
 
 
+trusted-replace-argument.js application/javascript
+function(propChain, argpos, argraw) {
+	'use strict';
+	const scriptletGlobals = {};
+	function safeSelf() {
+		if ( scriptletGlobals.safeSelf ) {
+			return scriptletGlobals.safeSelf;
+		}
+		const self = window;
+		const safe = {
+			'Object_fromEntries': Object.fromEntries.bind(Object),
+			'JSON': self.JSON,
+			'JSON_parseFn': self.JSON.parse,
+			'JSON_parse': (...args) => safe.JSON_parseFn.call(safe.JSON, ...args),
+			escapeRegexChars(s) {
+				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			},
+			patternToRegex(pattern, flags = undefined, verbatim = false) {
+				if ( pattern === '' ) { return /^/; }
+				const match = /^\/(.+)\/([gimsu]*)$/.exec(pattern);
+				if ( match === null ) {
+					const reStr = this.escapeRegexChars(pattern);
+					return new RegExp(verbatim ? `^${reStr}$` : reStr, flags);
+				}
+				try {
+					return new RegExp(match[1], match[2] || undefined);
+				}
+				catch(ex) {
+				}
+				return /^/;
+			},
+			getExtraArgs(args, offset = 0) {
+				const entries = args.slice(offset).reduce((out, v, i, a) => {
+					if ( (i & 1) === 0 ) {
+						const rawValue = a[i+1];
+						const value = /^\d+$/.test(rawValue)
+							? parseInt(rawValue, 10)
+							: rawValue;
+						out.push([ a[i], value ]);
+					}
+					return out;
+				}, []);
+				return this.Object_fromEntries(entries);
+			},
+		};
+		scriptletGlobals.safeSelf = safe;
+		return safe;
+	}
+	function makeLogPrefix(...args) {
+		return `uBO: [${args.join(' \u205D ')}]` || '';
+	}
+	function validateConstantFn(raw) {
+		const safe = safeSelf();
+		const extraArgs = safe.getExtraArgs(Array.from(arguments), 1);
+		let value;
+		if ( raw === 'undefined' ) {
+			value = undefined;
+		} else if ( raw === 'false' ) {
+			value = false;
+		} else if ( raw === 'true' ) {
+			value = true;
+		} else if ( raw === 'null' ) {
+			value = null;
+		} else if ( raw === "''" || raw === '' ) {
+			value = '';
+		} else if ( raw === '[]' || raw === 'emptyArr' ) {
+			value = [];
+		} else if ( raw === '{}' || raw === 'emptyObj' ) {
+			value = {};
+		} else if ( raw === 'noopFunc' ) {
+			value = function(){};
+		} else if ( raw === 'trueFunc' ) {
+			value = function(){ return true; };
+		} else if ( raw === 'falseFunc' ) {
+			value = function(){ return false; };
+		} else if ( /^-?\d+$/.test(raw) ) {
+			value = parseInt(raw);
+			if ( isNaN(raw) ) { return; }
+			if ( Math.abs(raw) > 0x7FFF ) { return; }
+		} else {
+			if ( raw.startsWith('{') && raw.endsWith('}') ) {
+				try { value = safe.JSON_parse(raw).value; } catch(ex) { return; }
+			}
+		}
+		if ( extraArgs.as !== undefined ) {
+			if ( extraArgs.as === 'function' ) {
+				return ( ) => value;
+			} else if ( extraArgs.as === 'callback' ) {
+				return ( ) => (( ) => value);
+			} else if ( extraArgs.as === 'resolved' ) {
+				return Promise.resolve(value);
+			} else if ( extraArgs.as === 'rejected' ) {
+				return Promise.reject(value);
+			}
+		}
+		return value;
+	}
+	function proxyApplyFn(
+		target = '',
+		handler = ''
+	) {
+		let context = self;
+		let prop = target;
+		for (;;) {
+			const pos = prop.indexOf('.');
+			if ( pos === -1 ) { break; }
+			context = context[prop.slice(0, pos)];
+			if ( context instanceof Object === false ) { return; }
+			prop = prop.slice(pos+1);
+		}
+		const fn = context[prop];
+		if ( typeof fn !== 'function' ) { return; }
+		if ( fn.prototype && fn.prototype.constructor === fn ) {
+			context[prop] = new Proxy(fn, { construct: handler });
+			return (...args) => { return Reflect.construct(...args); };
+		}
+		context[prop] = new Proxy(fn, { apply: handler });
+		return (...args) => { return Reflect.apply(...args); };
+	}
+	if ( propChain === undefined || propChain === '' ) { return; }
+	if ( argpos === undefined || argpos === '' ) { return; }
+	if ( argraw === undefined || argraw === '' ) { return; }
+	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('trusted-replace-argument', propChain, argpos, argraw));
+	const extraArgs = safe.getExtraArgs(Array.from(arguments), 3);
+	const normalValue = validateConstantFn(argraw);
+	const reCondition = extraArgs.condition
+		? safe.patternToRegex(extraArgs.condition)
+		: /^/;
+	const reflector = proxyApplyFn(propChain, function(...args) {
+		const arglist = args[args.length-1];
+		if ( Array.isArray(arglist) === false ) { return reflector(...args); }
+		const argBefore = arglist[argpos];
+		if ( reCondition.test(argBefore) === false ) { return reflector(...args); }
+		arglist[argpos] = normalValue;
+		log(`Replaced argument:\nBefore: ${JSON.stringify(argBefore)}\nAfter: ${normalValue}`);
+		return reflector(...args);
+	});
+}
+
+
 # https://github.com/gorhill/uBlock/commit/1de0e820b87fdd3717b9f2653baaa7a934075055
 no-requestAnimationFrame-if.js application/javascript
 alias norafif.js
