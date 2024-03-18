@@ -119,7 +119,7 @@ if (
     };
 
     const cancelPendingTasks = function() {
-        for ( let resolver of pendingResponses.values() ) {
+        for ( const resolver of pendingResponses.values() ) {
             resolver();
         }
         pendingResponses.clear();

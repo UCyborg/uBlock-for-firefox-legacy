@@ -2,7 +2,7 @@
 
 ### Firefox legacy
 
-Compatible with Firefox 44-56, [Pale Moon](https://www.palemoon.org/) and [SeaMonkey](http://www.seamonkey-project.org/).
+Compatible with Firefox 51-56, [Pale Moon](https://www.palemoon.org/) and [SeaMonkey](http://www.seamonkey-project.org/).
 
 - Download `ublock0.firefox-legacy.xpi` ([latest release desirable](https://github.com/UCyborg/uBlock-for-firefox-legacy/releases)).
     - Right-click and select "Save Link As..."
