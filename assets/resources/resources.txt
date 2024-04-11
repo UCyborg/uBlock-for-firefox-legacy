@@ -3481,7 +3481,6 @@ function(rawPrunePaths, rawNeedlePaths) {
 		}
 		return needles;
 	}
-
 	function matchesStackTrace(
 		needleDetails,
 		logLevel = ''
