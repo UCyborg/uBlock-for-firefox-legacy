@@ -4190,6 +4190,10 @@ function(m3uPattern, urlPattern) {
 	};
 	const pruner = text => {
 		if ( (/^\s*#EXTM3U/.test(text)) === false ) { return text; }
+		if ( m3uPattern === '' ) {
+			log(` Content:\n${text}`);
+			return text;
+		}
 		if ( reM3u.multiline ) {
 			reM3u.lastIndex = 0;
 			for (;;) {
