@@ -5896,6 +5896,8 @@ function(key, value) {
 		'false', 'true',
 		'on', 'off',
 		'yes', 'no',
+		'accept', 'reject',
+		'accepted', 'rejected',
 		'{}', '[]', '""',
 		'$remove$',
 	];
@@ -5967,15 +5969,6 @@ function(key, value) {
 	} else if ( value === 'emptyObj' ) {
 		value = '{}';
 	}
-	const trustedValues = [
-		'',
-		'undefined', 'null',
-		'false', 'true',
-		'on', 'off',
-		'yes', 'no',
-		'{}', '[]', '""',
-		'$remove$',
-	];
 	if ( value.includes('$now$') ) {
 		value = value.replaceAll('$now$', Date.now());
 	}
@@ -6051,6 +6044,8 @@ function(key, value) {
 		'false', 'true',
 		'on', 'off',
 		'yes', 'no',
+		'accept', 'reject',
+		'accepted', 'rejected',
 		'{}', '[]', '""',
 		'$remove$',
 	];
@@ -6122,15 +6117,6 @@ function(key, value) {
 	} else if ( value === 'emptyObj' ) {
 		value = '{}';
 	}
-	const trustedValues = [
-		'',
-		'undefined', 'null',
-		'false', 'true',
-		'on', 'off',
-		'yes', 'no',
-		'{}', '[]', '""',
-		'$remove$',
-	];
 	if ( value === '$now$' ) {
 		value = Date.now();
 	} else if ( value === '$currentDate$' ) {
