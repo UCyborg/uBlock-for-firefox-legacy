@@ -7341,7 +7341,7 @@ function(selector, attr, value) {
 
 remove-attr.js application/javascript
 alias ra.js
-function(token, selector, behavior) {
+function(rawToken, rawSelector, behavior) {
 	'use strict';
 	const scriptletGlobals = {};
 	function safeSelf() {
@@ -7350,8 +7350,22 @@ function(token, selector, behavior) {
 		}
 		const self = window;
 		const safe = {
+			'Object_fromEntries': Object.fromEntries.bind(Object),
 			'addEventListener': self.EventTarget.prototype.addEventListener,
 			'removeEventListener': self.EventTarget.prototype.removeEventListener,
+			getExtraArgs(args, offset = 0) {
+				const entries = args.slice(offset).reduce((out, v, i, a) => {
+					if ( (i & 1) === 0 ) {
+						const rawValue = a[i+1];
+						const value = /^\d+$/.test(rawValue)
+							? parseInt(rawValue, 10)
+							: rawValue;
+						out.push([ a[i], value ]);
+					}
+					return out;
+				}, []);
+				return this.Object_fromEntries(entries);
+			},
 		};
 		scriptletGlobals.safeSelf = safe;
 		return safe;
@@ -7384,12 +7398,18 @@ function(token, selector, behavior) {
 		const args = [ 'readystatechange', onStateChange, { capture: true } ];
 		safe.addEventListener.apply(document, args);
 	}
-	if ( token === undefined || token === '' ) { return; }
-	if ( selector === undefined ) { selector = ''; }
+	if ( rawToken === undefined || rawToken === '' ) { return; }
+	if ( rawSelector === undefined ) { rawSelector = ''; }
 	if ( behavior === undefined ) { behavior = ''; }
-	const tokens = token.split(/\s*\|\s*/);
-	if ( selector === '' ) {
-		selector = `[${tokens.join('],[')}]`;
+	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('remove-attr', rawToken, rawSelector, behavior));
+	const extraArgs = safe.getExtraArgs(Array.from(arguments), 3);
+	const tokens = rawToken.split(/\s*\|\s*/);
+	const selector = tokens
+		.map(a => `${rawSelector}[${CSS.escape(a)}]`)
+		.join(',');
+	if ( extraArgs.scripletLogLevel > 1 ) {
+		log(`Target selector:\n\t${selector}`);
 	}
 	let timer;
 	const rmattr = ( ) => {
@@ -7398,7 +7418,9 @@ function(token, selector, behavior) {
 			const nodes = document.querySelectorAll(selector);
 			for ( const node of nodes ) {
 				for ( const attr of tokens ) {
+					if ( node.hasAttribute(attr) === false ) { continue; }
 					node.removeAttribute(attr);
+					log(`Removed attribute '${attr}'`);
 				}
 			}
 		} catch(ex) {
@@ -7418,7 +7440,7 @@ function(token, selector, behavior) {
 			}
 		}
 		if ( skip ) { return; }
-		timer = self.requestIdleCallback(rmattr, { timeout: 17 });
+		timer = self.requestIdleCallback(rmattr, { timeout: 67 });
 	};
 	const start = ( ) => {
 		rmattr();
@@ -7439,7 +7461,7 @@ function(token, selector, behavior) {
 
 remove-class.js application/javascript
 alias rc.js
-function(token, selector, behavior) {
+function(rawToken, rawSelector, behavior) {
 	'use strict';
 	const scriptletGlobals = {};
 	function safeSelf() {
@@ -7448,8 +7470,22 @@ function(token, selector, behavior) {
 		}
 		const self = window;
 		const safe = {
+			'Object_fromEntries': Object.fromEntries.bind(Object),
 			'addEventListener': self.EventTarget.prototype.addEventListener,
 			'removeEventListener': self.EventTarget.prototype.removeEventListener,
+			getExtraArgs(args, offset = 0) {
+				const entries = args.slice(offset).reduce((out, v, i, a) => {
+					if ( (i & 1) === 0 ) {
+						const rawValue = a[i+1];
+						const value = /^\d+$/.test(rawValue)
+							? parseInt(rawValue, 10)
+							: rawValue;
+						out.push([ a[i], value ]);
+					}
+					return out;
+				}, []);
+				return this.Object_fromEntries(entries);
+			},
 		};
 		scriptletGlobals.safeSelf = safe;
 		return safe;
@@ -7482,21 +7518,28 @@ function(token, selector, behavior) {
 		const args = [ 'readystatechange', onStateChange, { capture: true } ];
 		safe.addEventListener.apply(document, args);
 	}
-	if ( token === undefined || token === '' ) { return; }
-	if ( selector === undefined ) { selector = ''; }
+	if ( rawToken === undefined || rawToken === '' ) { return; }
+	if ( rawSelector === undefined ) { rawSelector = ''; }
 	if ( behavior === undefined ) { behavior = ''; }
-	const classTokens = token.split(/\s*\|\s*/);
-	if ( selector === '' ) {
-		selector = '.' + classTokens.map(a => CSS.escape(a)).join(',.');
+	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('remove-class', rawToken, rawSelector, behavior));
+	const extraArgs = safe.getExtraArgs(Array.from(arguments), 3);
+	const tokens = rawToken.split(/\s*\|\s*/);
+	const selector = tokens
+		.map(a => `${rawSelector}[${CSS.escape(a)}]`)
+		.join(',');
+	if ( extraArgs.scripletLogLevel > 1 ) {
+		log(`Target selector:\n\t${selector}`);
 	}
 	const mustStay = /\bstay\b/.test(behavior);
 	let timer;
-	const rmclass = function() {
+	const rmclass = ( ) => {
 		timer = undefined;
 		try {
 			const nodes = document.querySelectorAll(selector);
 			for ( const node of nodes ) {
-				node.classList.remove(...classTokens);
+				node.classList.remove(...tokens);
+				log('Removed class(es)');
 			}
 		} catch(ex) {
 		}
