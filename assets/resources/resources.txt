@@ -1956,6 +1956,7 @@ function(needle) {
 		}
 		const self = window;
 		const safe = {
+			'Object_fromEntries': Object.fromEntries.bind(Object),
 			escapeRegexChars(s) {
 				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			},
@@ -1973,16 +1974,38 @@ function(needle) {
 				}
 				return /^/;
 			},
+			getExtraArgs(args, offset = 0) {
+				const entries = args.slice(offset).reduce((out, v, i, a) => {
+					if ( (i & 1) === 0 ) {
+						const rawValue = a[i+1];
+						const value = /^\d+$/.test(rawValue)
+							? parseInt(rawValue, 10)
+							: rawValue;
+						out.push([ a[i], value ]);
+					}
+					return out;
+				}, []);
+				return this.Object_fromEntries(entries);
+			},
 		};
 		scriptletGlobals.safeSelf = safe;
 		return safe;
 	}
 	if ( needle === undefined ) { needle = ''; }
 	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('noeval-if', needle));
+	const extraArgs = safe.getExtraArgs(Array.from(arguments), 1);
 	const reNeedle = safe.patternToRegex(needle);
 	self.eval = new Proxy(self.eval, {  // jshint ignore: line
 		apply: function(target, thisArg, args) {
-			if ( reNeedle.test(args[0].toString()) ) { return; }
+			const a = String(args[0]);
+			if ( needle !== '' && reNeedle.test(a) ) {
+				log('Prevented:\n', a);
+				return;
+			}
+			if ( needle === '' || extraArgs.scripletLogLevel > 1 ) {
+				log('Not prevented:\n', a);
+			}
 			return Reflect.apply(target, thisArg, args);
 		}
 	});
