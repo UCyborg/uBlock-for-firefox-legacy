@@ -5598,6 +5598,9 @@ function(name, value, offsetExpiresSec, path) {
 	if ( value.includes('$currentDate$') ) {
 		value = value.replaceAll('$currentDate$', time.toUTCString());
 	}
+	if ( value.includes('$currentISODate$') ) {
+		value = value.replaceAll('$currentISODate$', time.toISOString());
+	}
 	let expires = '';
 	if ( offsetExpiresSec !== '' ) {
 		if ( offsetExpiresSec === '1day' ) {
@@ -5840,6 +5843,9 @@ function(name, value, offsetExpiresSec, path) {
 	}
 	if ( value.includes('$currentDate$') ) {
 		value = value.replaceAll('$currentDate$', time.toUTCString());
+	}
+	if ( value.includes('$currentISODate$') ) {
+		value = value.replaceAll('$currentISODate$', time.toISOString());
 	}
 	let expires = '';
 	if ( offsetExpiresSec !== '' ) {
