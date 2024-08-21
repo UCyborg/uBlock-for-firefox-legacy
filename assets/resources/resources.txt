@@ -5447,6 +5447,9 @@ function(name, value, path) {
 		if ( path === '/' ) {
 			cookieParts.push('; path=/');
 		}
+		if ( /^__(Host|Secure)-/.test(name) ) {
+			cookieParts.push('; Secure');
+		}
 		try {
 			document.cookie = cookieParts.join('');
 		} catch(_) {
