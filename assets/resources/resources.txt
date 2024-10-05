@@ -6400,7 +6400,7 @@ function(needleArg, delayArg, boostArg) {
 
 prevent-fetch.js application/javascript
 alias no-fetch-if.js
-function(propsToMatch, responseBody) {
+function(propsToMatch, responseBody, responseType) {
 	'use strict';
 	const scriptletGlobals = {};
 	function safeSelf() {
@@ -6412,7 +6412,7 @@ function(propsToMatch, responseBody) {
 			'Math_max': Math.max,
 			'Math_min': Math.min,
 			'Math_random': Math.random,
-			'Object_defineProperty': Object.defineProperty.bind(Object),
+			'Object_defineProperties': Object.defineProperties.bind(Object),
 			'JSON': self.JSON,
 			'JSON_stringifyFn': self.JSON.stringify,
 			'JSON_stringify': (...args) => safe.JSON_stringifyFn.call(safe.JSON, ...args),
@@ -6479,7 +6479,7 @@ function(propsToMatch, responseBody) {
 	if ( propsToMatch === undefined ) { propsToMatch = ''; }
 	if ( responseBody === undefined ) { responseBody = ''; }
 	const safe = safeSelf();
-	const logPrefix = makeLogPrefix('prevent-fetch', propsToMatch, responseBody);
+	const logPrefix = makeLogPrefix('prevent-fetch', propsToMatch, responseBody, responseType);
 	const log = console.log.bind(console, logPrefix);
 	const logErr = console.error.bind(console, logPrefix);
 	const needles = [];
@@ -6495,6 +6495,26 @@ function(propsToMatch, responseBody) {
 			value = condition;
 		}
 		needles.push({ key, re: safe.patternToRegex(value) });
+	}
+	const validResponseProps = {
+		ok: [ false, true ],
+		type: [ 'basic', 'cors', 'opaque' ],
+	};
+	let responseProps;
+	if ( /^\{.*\}$/.test(responseType) ) {
+		responseProps = {};
+		try {
+			Object.entries(JSON.parse(responseType)).forEach(([ p, v ]) => {
+				if ( validResponseProps[p] === undefined ) { return; }
+				if ( validResponseProps[p].includes(v) === false ) { return; }
+				responseProps[p] = { value: v };
+			});
+		}
+		catch(ex) {}
+	} else if ( responseType !== '' ) {
+		if ( validResponseProps.type.includes(responseType) ) {
+			responseProps = { type: { value: responseType } };
+		}
 	}
 	self.fetch = new Proxy(self.fetch, {
 		apply: function(target, thisArg, args) {
@@ -6533,17 +6553,6 @@ function(propsToMatch, responseBody) {
 			if ( proceed ) {
 				return Reflect.apply(target, thisArg, args);
 			}
-			let responseType = '';
-			if ( details.mode === undefined || details.mode === 'cors' ) {
-				try {
-					const desURL = new URL(details.url);
-					responseType = desURL.origin !== document.location.origin
-						? 'cors'
-						: 'basic';
-				} catch(ex) {
-					logErr(`Error: ${ex}`);
-				}
-			}
 			return generateContentFn(responseBody).then(text => {
 				log(`Prevented with response "${text}"`);
 				const response = new Response(text, {
@@ -6552,14 +6561,11 @@ function(propsToMatch, responseBody) {
 						'Content-Length': text.length,
 					}
 				});
-				safe.Object_defineProperty(response, 'url', {
-					value: details.url
-				});
-				if ( responseType !== '' ) {
-					safe.Object_defineProperty(response, 'type', {
-						value: responseType
-					});
-				}
+				const props = Object.assign(
+					{ url: { value: details.url } },
+					responseProps
+				);
+				safe.Object_defineProperties(response, props);
 				return response;
 			});
 		}
