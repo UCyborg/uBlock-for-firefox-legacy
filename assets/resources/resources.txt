@@ -8940,7 +8940,7 @@ function(propChain, rawPrunePaths, rawNeedlePaths) {
 
 
 trusted-replace-argument.js application/javascript
-function(propChain, argpos, argraw) {
+function(propChain, argposRaw, argraw) {
 	'use strict';
 	const scriptletGlobals = {};
 	function safeSelf() {
@@ -8953,6 +8953,7 @@ function(propChain, argpos, argraw) {
 			'JSON': self.JSON,
 			'JSON_parseFn': self.JSON.parse,
 			'JSON_parse': (...args) => safe.JSON_parseFn.call(safe.JSON, ...args),
+			'RegExp_test': self.RegExp.prototype.test,
 			escapeRegexChars(s) {
 				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 			},
@@ -9059,20 +9060,27 @@ function(propChain, argpos, argraw) {
 		return (...args) => { return Reflect.apply(...args); };
 	}
 	if ( propChain === undefined || propChain === '' ) { return; }
-	if ( argpos === undefined || argpos === '' ) { return; }
-	if ( argraw === undefined || argraw === '' ) { return; }
+	if ( argposRaw === undefined ) { argposRaw = ''; }
+	if ( argraw === undefined ) { argraw = ''; }
 	const safe = safeSelf();
-	const log = console.log.bind(console, makeLogPrefix('trusted-replace-argument', propChain, argpos, argraw));
+	const log = console.log.bind(console, makeLogPrefix('trusted-replace-argument', propChain, argposRaw, argraw));
+	const argpos = parseInt(argposRaw, 10) || 0;
 	const extraArgs = safe.getExtraArgs(Array.from(arguments), 3);
 	const normalValue = validateConstantFn(argraw);
 	const reCondition = extraArgs.condition
 		? safe.patternToRegex(extraArgs.condition)
 		: /^/;
 	const reflector = proxyApplyFn(propChain, function(...args) {
+		if ( argposRaw === '' ) {
+			log(`Arguments:\n${args.join('\n')}`);
+			return reflector(...args);
+		}
 		const arglist = args[args.length-1];
 		if ( Array.isArray(arglist) === false ) { return reflector(...args); }
 		const argBefore = arglist[argpos];
-		if ( reCondition.test(argBefore) === false ) { return reflector(...args); }
+		if ( safe.RegExp_test.call(reCondition, argBefore) === false ) {
+			return reflector(...args);
+		}
 		arglist[argpos] = normalValue;
 		log(`Replaced argument:\nBefore: ${JSON.stringify(argBefore)}\nAfter: ${normalValue}`);
 		return reflector(...args);
