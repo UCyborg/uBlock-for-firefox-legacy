@@ -9194,6 +9194,109 @@ function(propChain, pattern, replacement) {
 }
 
 
+ # Reference:
+ # https://github.com/AdguardTeam/Scriptlets/blob/5a92d79489/wiki/about-trusted-scriptlets.md#trusted-suppress-native-method
+ # 
+ # This is a first version with current limitations:
+ # - Does not support matching arguments which are object or array
+ # - Does not support `stack` parameter
+ # 
+ # If `signatureStr` parameter is not declared, the scriptlet will log all calls
+ # to `methodPath` along with the arguments passed and will not prevent the
+ # trapped method.
+ trusted-suppress-native-method.js application/javascript
+ function(methodPath, signature, how, stack) {
+	'use strict';
+	const scriptletGlobals = {};
+	function safeSelf() {
+		if ( scriptletGlobals.safeSelf ) {
+			return scriptletGlobals.safeSelf;
+		}
+		const self = window;
+		const safe = {
+			'RegExp_test': self.RegExp.prototype.test,
+			escapeRegexChars(s) {
+				return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			},
+			patternToRegex(pattern, flags = undefined, verbatim = false) {
+				if ( pattern === '' ) { return /^/; }
+				const match = /^\/(.+)\/([gimsu]*)$/.exec(pattern);
+				if ( match === null ) {
+					const reStr = this.escapeRegexChars(pattern);
+					return new RegExp(verbatim ? `^${reStr}$` : reStr, flags);
+				}
+				try {
+					return new RegExp(match[1], match[2] || undefined);
+				}
+				catch(ex) {
+				}
+				return /^/;
+			},
+		};
+		scriptletGlobals.safeSelf = safe;
+		return safe;
+	}
+	function makeLogPrefix(...args) {
+		return `uBO: [${args.join(' \u205D ')}]` || '';
+	}
+	if ( methodPath === undefined || methodPath === '' ) { return; }
+	if ( signature === undefined ) { signature = ''; }
+	if ( how === undefined ) { how = ''; }
+	if ( stack !== undefined && stack !== '' ) { return; }
+	const safe = safeSelf();
+	const log = console.log.bind(console, makeLogPrefix('trusted-suppress-native-method', methodPath, signature, how));
+	const signatureArgs = signature.split(/\s*\|\s*/).map(v => {
+		if ( /^".*"$/.test(v) ) {
+			return { type: 'pattern', re: safe.patternToRegex(v.slice(1, -1)) };
+		}
+		if ( v === 'false' ) {
+			return { type: 'exact', value: false };
+		}
+		if ( v === 'true' ) {
+			return { type: 'exact', value: true };
+		}
+		if ( v === 'null' ) {
+			return { type: 'exact', value: null };
+		}
+		if ( v === 'undefined' ) {
+			return { type: 'exact', value: undefined };
+		}
+	});
+	const reflector = proxyApplyFn(methodPath, function(...args) {
+		if ( signature === '' ) {
+			log(`Arguments:\n${args.join('\n')}`);
+			return reflector(...args);
+		}
+		const arglist = args[args.length-1];
+		if ( Array.isArray(arglist) === false ) {
+			return reflector(...args);
+		}
+		if ( arglist.length < signatureArgs.length ) {
+			return reflector(...args);
+		}
+		for ( let i = 0; i < signatureArgs.length; i++ ) {
+			const signatureArg = signatureArgs[i];
+			if ( signatureArg === undefined ) { continue; }
+			const targetArg = arglist[i];
+			if ( signatureArg.type === 'exact' ) {
+				if ( targetArg !== signatureArg.value ) {
+					return reflector(...args);
+				}
+			}
+			if ( signatureArg.type === 'pattern' ) {
+				if ( safe.RegExp_test.call(signatureArg.re, targetArg) === false ) {
+					return reflector(...args);
+				}
+			}
+		}
+		log(`Suppressed:\n${args.join('\n')}`);
+		if ( how === 'abort' ) {
+			throw new ReferenceError();
+		}
+	});	
+ }
+
+
 # https://github.com/gorhill/uBlock/commit/1de0e820b87fdd3717b9f2653baaa7a934075055
 no-requestAnimationFrame-if.js application/javascript
 alias norafif.js
