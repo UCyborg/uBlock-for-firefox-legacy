@@ -286,8 +286,13 @@
         const compileStyleProperties = (( ) => {
             let div;
             // https://github.com/uBlockOrigin/uBlock-issues/issues/668
+            // https://github.com/uBlockOrigin/uBlock-issues/issues/1693
+            //   Forbid instances of:
+            //   - `url(`
+            //   - backslashes `\`
+            //   - opening comment `/*`
             return function(s) {
-                if ( /url\(|\\/i.test(s) ) { return; }
+                if ( /url\(|\\|\/\*/i.test(s) ) { return; }
                 if ( div === undefined ) {
                     div = document.createElement('div');
                 }
