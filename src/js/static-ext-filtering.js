@@ -54,12 +54,30 @@
     const µb = µBlock;
     const reHasUnicode = /[^\x00-\x7F]/;
     const reParseRegexLiteral = /^\/(.+)\/([imu]+)?$/;
+    const rePseudoElement = /:(?::?after|:?before|:-?[a-z][a-z-]*[a-z])$/;
+    const reSimpleSelector = /^[#.][A-Za-z_][\w-]*$/;
     const emptyArray = [];
     const parsed = {
         hostnames: [],
         exception: false,
         suffix: ''
     };
+
+    // https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleSheet#browser_compatibility
+    //   Firefox does not support constructor for CSSStyleSheet
+    const stylesheet = (( ) => {
+        if ( typeof document !== 'object' ) { return null; }
+        if ( document instanceof Object === false ) { return null; }
+        try {
+            return new CSSStyleSheet();
+        } catch(ex) {
+        }
+        const style = document.createElement('style');
+        document.body.append(style);
+        const stylesheet = style.sheet;
+        style.remove();
+        return stylesheet;
+    })();
 
     // To be called to ensure no big parent string of a string slice is
     // left into memory after parsing filter lists is over.
@@ -68,51 +86,44 @@
         parsed.suffix = '';
     };
 
-    const cssPseudoSelector = (( ) => {
-        const rePseudo = /:(?::?after|:?before|:[a-z][a-z-]*[a-z])$/;
-        return function(s) {
-            if ( s.lastIndexOf(':') === -1 ) { return -1; }
-            const match = rePseudo.exec(s);
-            return match !== null ? match.index : -1;
-        };
-    })();
+    const cssPseudoSelector = function(s) {
+        if ( s.lastIndexOf(':') === -1 ) { return -1; }
+        const match = rePseudoElement.exec(s);
+        return match !== null ? match.index : -1;
+    };
 
     // Return value:
     //   0b00 (0) = not a valid CSS selector
     //   0b01 (1) = valid CSS selector, without pseudo-element
     //   0b11 (3) = valid CSS selector, with pseudo element
-    const cssSelectorType = (( ) => {
-        const div = document.createElement('div');
-        // Keep in mind:
-        //   https://github.com/gorhill/uBlock/issues/693
-        //   https://github.com/gorhill/uBlock/issues/1955
-        // https://github.com/gorhill/uBlock/issues/3111
-        //   Workaround until https://bugzilla.mozilla.org/show_bug.cgi?id=1406817
-        //   is fixed.
-        let matchFn;
-        try {
-            div.matches(':scope');
-            matchFn = div.matches.bind(div);
-        } catch (ex) {
-            matchFn = div.querySelector.bind(div);
+    //
+    // Quick regex-based validation -- most cosmetic filters are of the
+    // simple form and in such case a regex is much faster.
+    // Keep in mind:
+    //   https://github.com/gorhill/uBlock/issues/693
+    //   https://github.com/gorhill/uBlock/issues/1955
+    // https://github.com/gorhill/uBlock/issues/3111
+    //   Workaround until https://bugzilla.mozilla.org/show_bug.cgi?id=1406817
+    //   is fixed.
+    // https://github.com/uBlockOrigin/uBlock-issues/issues/1751
+    //   Do not rely on matches() or querySelector() to test whether a
+    //   selector is declarative or not.
+    const cssSelectorType = function(s) {
+        if ( reSimpleSelector.test(s) ) { return 1; }
+        const pos = cssPseudoSelector(s);
+        if ( pos !== -1 ) {
+            return cssSelectorType(s.slice(0, pos)) === 1 ? 3 : 0;
         }
-        // Quick regex-based validation -- most cosmetic filters are of the
-        // simple form and in such case a regex is much faster.
-        const reSimple = /^[#.][A-Za-z_][\w-]*$/;
-        return s => {
-            if ( reSimple.test(s) ) { return 1; }
-            const pos = cssPseudoSelector(s);
-            if ( pos !== -1 ) {
-                return cssSelectorType(s.slice(0, pos)) === 1 ? 3 : 0;
-            }
-            try {
-                matchFn(`${s}, ${s}:not(#foo)`);
-            } catch (ex) {
-                return 0;
-            }
-            return 1;
-        };
-    })();
+        if ( stylesheet === null ) { return 1; }
+        try {
+            stylesheet.insertRule(`${s}{color:red}`);
+            if ( stylesheet.cssRules.length === 0 ) { return 0; }
+            stylesheet.deleteRule(0);
+        } catch (ex) {
+            return 0;
+        }
+        return 1;
+    };
 
 
     const isBadRegex = function(s) {
@@ -283,25 +294,28 @@
         };
 
 
-        const compileStyleProperties = (( ) => {
-            let div;
+        const compileStyleProperties = function(s) {
             // https://github.com/uBlockOrigin/uBlock-issues/issues/668
             // https://github.com/uBlockOrigin/uBlock-issues/issues/1693
             //   Forbid instances of:
             //   - `url(`
             //   - backslashes `\`
             //   - opening comment `/*`
-            return function(s) {
-                if ( /url\(|\\|\/\*/i.test(s) ) { return; }
-                if ( div === undefined ) {
-                    div = document.createElement('div');
-                }
-                div.style.cssText = s;
-                if ( div.style.cssText === '' ) { return; }
-                div.style.cssText = '';
-                return s;
-            };
-        })();
+            if ( /url\(|\\|\/\*/i.test(s) ) { return; }
+            if ( stylesheet === null ) { return s; }
+            let valid = false;
+            try {
+                stylesheet.insertRule(`a{${s}}`);
+                const rules = stylesheet.cssRules;
+                valid = rules.length !== 0 && rules[0].style.cssText !== '';
+            } catch(ex) {
+                return;
+            }
+            if ( stylesheet.cssRules.length !== 0 ) {
+                stylesheet.deleteRule(0);
+            }
+            if ( valid ) { return s; }
+        };
 
         const compileAttrList = function(s) {
             const attrs = s.split('\s*,\s*');
@@ -745,7 +759,9 @@
                 entryPoint.pseudoclass = compiled.pseudo;
             }
 
-            return JSON.stringify(compiled);
+            return compiled.selector !== compiled.raw
+                ? JSON.stringify(compiled)
+                : compiled.selector;
         };
 
         entryPoint.pseudoclass = -1;
