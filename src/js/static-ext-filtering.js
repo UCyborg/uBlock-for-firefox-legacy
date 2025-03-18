@@ -307,11 +307,14 @@
         const compileStyleProperties = function(s) {
             // https://github.com/uBlockOrigin/uBlock-issues/issues/668
             // https://github.com/uBlockOrigin/uBlock-issues/issues/1693
+            // https://github.com/uBlockOrigin/uBlock-issues/issues/1811
             //   Forbid instances of:
+            //   - `image-set(`
             //   - `url(`
+            //   - any instance of `//`
             //   - backslashes `\`
             //   - opening comment `/*`
-            if ( /url\(|\\|\/\*/i.test(s) ) { return; }
+            if ( /image-set\(|url\(|\/\s*\/|\\|\/\*/i.test(s) ) { return; }
             if ( stylesheet === null ) { return s; }
             let valid = false;
             try {
