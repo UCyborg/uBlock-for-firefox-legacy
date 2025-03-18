@@ -91,11 +91,15 @@
         parsed.suffix = '';
     };
 
+    // https://github.com/uBlockOrigin/uBlock-issues/issues/1806
+    //   Forbid instances of:
+    //   - opening comment `/*`
     const querySelectable = function(s) {
         if ( reSimpleSelector.test(s) ) { return true; }
         if ( div === null ) { return true; }
         try {
             div.querySelector(`${s},${s}:not(#foo)`);
+            if ( s.includes('/*') ) { return false; }
         } catch (ex) {
             return false;
         }
