@@ -54,7 +54,6 @@
     const µb = µBlock;
     const reHasUnicode = /[^\x00-\x7F]/;
     const reParseRegexLiteral = /^\/(.+)\/([imu]+)?$/;
-    const rePseudoElement = /:(?::?after|:?before|:-?[a-z][a-z-]*[a-z])$/;
     const reSimpleSelector = /^[#.][A-Za-z_][\w-]*$/;
     const emptyArray = [];
     const parsed = {
@@ -62,6 +61,12 @@
         exception: false,
         suffix: ''
     };
+
+    const div = (( ) => {
+        if ( typeof document !== 'object' ) { return null; }
+        if ( document instanceof Object === false ) { return null; }
+        return document.createElement('div');
+    })();
 
     // https://developer.mozilla.org/en-US/docs/Web/API/CSSStyleSheet#browser_compatibility
     //   Firefox does not support constructor for CSSStyleSheet
@@ -86,17 +91,17 @@
         parsed.suffix = '';
     };
 
-    const cssPseudoSelector = function(s) {
-        if ( s.lastIndexOf(':') === -1 ) { return -1; }
-        const match = rePseudoElement.exec(s);
-        return match !== null ? match.index : -1;
+    const querySelectable = function(s) {
+        if ( reSimpleSelector.test(s) ) { return true; }
+        if ( div === null ) { return true; }
+        try {
+            div.querySelector(`${s},${s}:not(#foo)`);
+        } catch (ex) {
+            return false;
+        }
+        return true;
     };
 
-    // Return value:
-    //   0b00 (0) = not a valid CSS selector
-    //   0b01 (1) = valid CSS selector, without pseudo-element
-    //   0b11 (3) = valid CSS selector, with pseudo element
-    //
     // Quick regex-based validation -- most cosmetic filters are of the
     // simple form and in such case a regex is much faster.
     // Keep in mind:
@@ -108,21 +113,17 @@
     // https://github.com/uBlockOrigin/uBlock-issues/issues/1751
     //   Do not rely on matches() or querySelector() to test whether a
     //   selector is declarative or not.
-    const cssSelectorType = function(s) {
-        if ( reSimpleSelector.test(s) ) { return 1; }
-        const pos = cssPseudoSelector(s);
-        if ( pos !== -1 ) {
-            return cssSelectorType(s.slice(0, pos)) === 1 ? 3 : 0;
-        }
-        if ( stylesheet === null ) { return 1; }
+    const sheetSelectable = function(s) {
+        if ( reSimpleSelector.test(s) ) { return true; }
+        if ( stylesheet === null ) { return true; }
         try {
             stylesheet.insertRule(`${s}{color:red}`);
-            if ( stylesheet.cssRules.length === 0 ) { return 0; }
+            if ( stylesheet.cssRules.length === 0 ) { return false; }
             stylesheet.deleteRule(0);
         } catch (ex) {
-            return 0;
+            return false;
         }
-        return 1;
+        return true;
     };
 
 
@@ -272,7 +273,7 @@
             //   Reject instances of :not() filters for which the argument is
             //   a valid CSS selector, otherwise we would be adversely
             //   changing the behavior of CSS4's :not().
-            if ( cssSelectorType(s) === 0 ) {
+            if ( sheetSelectable(s) === false ) {
                 return compileConditionalSelector(s);
             }
         };
@@ -280,7 +281,7 @@
         const compileUpwardArgument = function(s) {
             const i = compileInteger(s, 1, 256);
             if ( i !== undefined ) { return i; }
-            if ( cssSelectorType(s) === 1 ) { return s; }
+            if ( sheetSelectable(s) ) { return s; }
         };
 
         const compileRemoveSelector = function(s) {
@@ -288,7 +289,7 @@
         };
 
         const compileSpathExpression = function(s) {
-            if ( cssSelectorType('*' + s) === 1 ) {
+            if ( sheetSelectable('*' + s) ) {
                 return s;
             }
         };
@@ -479,7 +480,7 @@
                 // https://github.com/uBlockOrigin/uBlock-issues/issues/341#issuecomment-447603588
                 //   Maybe that one operator is a valid CSS selector and if so,
                 //   then consider it to be part of the prefix.
-                if ( cssSelectorType(raw.slice(opNameBeg, i)) === 1 ) {
+                if ( sheetSelectable(raw.slice(opNameBeg, i)) ) {
                     continue;
                 }
                 // Extract and remember operator details.
@@ -515,7 +516,17 @@
             // No task found: then we have a CSS selector.
             // At least one task found: nothing should be left to parse.
             if ( tasks.length === 0 ) {
-                prefix = raw;
+                if ( action === undefined ) {
+                    prefix = raw;
+                }
+                if ( root && sheetSelectable(prefix) ) {
+                    if ( action === undefined ) {
+                        return { selector: prefix };
+                    } else if ( action[0] === ':style' ) {
+                        return { selector: prefix, action };
+                    }
+                }
+
             } else if ( opPrefixBeg < n ) {
                 if ( action !== undefined ) { return; }
                 const spath = compileSpathExpression(raw.slice(opPrefixBeg));
@@ -529,7 +540,7 @@
             //   only if context is not the root.
             if ( prefix !== '' ) {
                 if ( reIsDanglingSelector.test(prefix) ) { prefix += '*'; }
-                if ( cssSelectorType(prefix) === 0 ) {
+                if ( sheetSelectable(prefix) === false ) {
                     if (
                         root ||
                         reIsSiblingSelector.test(prefix) === false ||
@@ -551,15 +562,6 @@
             // Expose action to take in root descriptor.
             if ( action !== undefined ) {
                 out.action = action;
-            }
-
-            // Pseudo-selectors are valid only when used in a root task list.
-            if ( prefix !== '' ) {
-                const pos = cssPseudoSelector(prefix);
-                if ( pos !== -1 ) {
-                    if ( root === false ) { return; }
-                    out.pseudo = pos;
-                }
             }
 
             return out;
@@ -722,10 +724,8 @@
         ]);
 
         const entryPoint = function(raw) {
-            entryPoint.pseudoclass = -1;
-
             const extendedSyntax = reExtendedSyntax.test(raw);
-            if ( cssSelectorType(raw) === 1 && extendedSyntax === false ) {
+            if ( sheetSelectable(raw) && extendedSyntax === false ) {
                 return raw;
             }
 
@@ -755,16 +755,10 @@
             const compiled = compileProceduralSelector(raw);
             if ( compiled === undefined ) { return; }
 
-            if ( compiled.pseudo !== undefined ) {
-                entryPoint.pseudoclass = compiled.pseudo;
-            }
-
             return compiled.selector !== compiled.raw
                 ? JSON.stringify(compiled)
                 : compiled.selector;
         };
-
-        entryPoint.pseudoclass = -1;
 
         return entryPoint;
     })();

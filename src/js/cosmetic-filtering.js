@@ -648,11 +648,7 @@ FilterContainer.prototype.compileGenericHideSelector = function(parsed, writer) 
     // https://github.com/uBlockOrigin/uBlock-issues/issues/464
     //   Pseudoclass-based selectors can be compiled, but are also valid
     //   plain selectors.
-    if (
-        compiled === undefined ||
-        compiled !== selector &&
-        µb.staticExtFilteringEngine.compileSelector.pseudoclass === -1
-    ) {
+    if ( compiled !== selector ) {
         const who = writer.properties.get('assetKey') || '?';
         µb.logger.writeOne('', 'error', `Invalid generic cosmetic filter in ${who} : ##${selector}`);
         return;
