@@ -755,9 +755,10 @@
             const compiled = compileProceduralSelector(raw);
             if ( compiled === undefined ) { return; }
 
-            return compiled.selector !== compiled.raw
-                ? JSON.stringify(compiled)
-                : compiled.selector;
+            return compiled.selector !== compiled.raw ||
+                   sheetSelectable(compiled.selector) === false
+                       ? JSON.stringify(compiled)
+                       : compiled.selector;
         };
 
         return entryPoint;
