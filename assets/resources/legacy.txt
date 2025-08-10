@@ -1,5 +1,5 @@
 ! Title: uBlock filters -- Legacy
-! Last modified: Sun, 10 Aug 2025 14:32:00 +0000
+! Last modified: Sun, 10 Aug 2025 14:42:15 +0000
 ! Expires: 11 days
 ! Description: Filters to address issues specific to legacy versions of uBO.
 ! Homepage: https://github.com/uBlockOrigin/uAssets
@@ -80,3 +80,6 @@ tvguia.es##^script:has-text(detectAdBlockerAsync)
 
 ! https://github.com/uBlockOrigin/uAssets/commit/51730b6c5ed3e900e41bb058129608807b23cb76#commitcomment-127164376
 ||imasdk.googleapis.com/js/sdkloader/ima3.js$script,redirect-rule=google-ima.js,from=abczdrowie.pl|animezone.pl|antyradio.pl|autocentrum.pl|chillizet.pl|claudia.pl|echirurgia.pl|elevensports.pl|elle.pl|elleman.pl|fm.tuba.pl|focusnauka.pl|games.cdn.famobi.com|glamour.pl|grydladzieci.pl|interia.pl|ipla.tv|ipla.tv|kobieta.pl|meloradio.pl|mojegotowanie.pl|mojpieknyogrod.pl|money.pl|national-geographic.pl|parenting.pl|partner.redefine.pl|playpuls.pl|pluscdn.pl|polsatgo.pl|polsatnews.pl|polsatsport.pl|przyslijprzepis.pl|radioplus.pl|radiozet.pl|sadeczanin.info|tvokazje.pl|tvp.pl|twojapogoda.pl|video.onnetwork.tv|videotarget.pl|wp.pl|wtk.pl|www.polsatnews.pl
+
+! https://gitlab.com/malware-filter/phishing-filter/-/issues/99
+&$badfilter
