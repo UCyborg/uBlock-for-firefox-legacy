@@ -353,6 +353,12 @@ RedirectEngine.prototype.compileRuleFromStaticFilter = function(line) {
     // Need a resource token.
     if ( redirect === '' ) { return; }
 
+    // Specifying priority is not supported, at least prevent compiling invalid rule.
+    const prioIdx = redirect.indexOf(':');
+    if ( prioIdx !== -1 ) {
+        redirect = redirect.substring(0, prioIdx);
+    }
+
     // Need one single type -- not negated.
     if ( type === undefined ) { return; }
 
